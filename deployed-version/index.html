@@ -529,31 +529,48 @@
             updateStatus('Select an audio file and choose your preferred transcription engine to begin.');
         }
         
-        function transcribeAudio() {
+        async function transcribeAudio() {
             if (!selectedFile) {
                 updateStatus('Please select an audio file first.', 'error');
                 return;
             }
             
-            const engine = document.getElementById('engineSelect').value;
             const transcribeBtn = document.getElementById('transcribeBtn');
             
             transcribeBtn.disabled = true;
             transcribeBtn.innerHTML = '<span>⏳</span> Processing...';
             
-            updateStatus(`Starting transcription with ${engine === 'openai' ? 'OpenAI Whisper API' : 'Local Whisper Engine'}...<br>File: ${selectedFile.name} (${(selectedFile.size/1024/1024).toFixed(2)} MB)`, 'processing');
+            updateStatus(`Starting transcription...<br>File: ${selectedFile.name} (${(selectedFile.size/1024/1024).toFixed(2)} MB)`, 'processing');
             
-            // Simulate API call
-            setTimeout(() => {
-                if (engine === 'openai') {
-                    updateStatus(`✅ OpenAI Whisper API integration ready!<br><small>Actual transcription will start when API key is configured.</small><br>📄 File: ${selectedFile.name}`, 'success');
-                } else {
-                    updateStatus(`⚠️ Local Whisper engine test initiated...<br><small>Note: May fail on e2-micro instance due to memory constraints.</small><br>📄 File: ${selectedFile.name}`, 'warning');
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+                formData.append('language', 'en');
+                
+                const response = await fetch('http://34.71.58.225:8000/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
+                const result = await response.json();
+                
+                updateStatus(
+                    `✅ Transcription completed!<br>` +
+                    `<strong>Text:</strong> ${result.text}<br>` +
+                    `<small>Language: ${result.language} | Size: ${result.file_size_mb}MB | Model: ${result.model}</small>`,
+                    'success'
+                );
+                
+            } catch (error) {
+                updateStatus(`❌ Transcription failed: ${error.message}`, 'error');
+            } finally {
                 transcribeBtn.disabled = false;
                 transcribeBtn.innerHTML = '<span>🚀</span> Start Transcription';
-            }, 2500);
+            }
         }
         
         async function checkServices() {
